@@ -30,7 +30,7 @@ class MN_Bot(Client):
             plugins=dict(root="plugins"),
             workers=16,
         )
-        self.delete_before = 10  # Time range in minutes for message deletion
+        self.delete_before = 3  # Time range in minutes for message deletion
 
     async def start(self):
         await super().start()
