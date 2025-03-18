@@ -2,9 +2,10 @@ import asyncio
 import feedparser
 import logging
 import threading
+import re
 from flask import Flask
 from pyrogram import Client
-from config import BOT, API, WEB, OWNER, CHANNEL  # Import CHANNEL from config
+from config import BOT, API, OWNER, CHANNEL  # Removed unused WEB import
 
 # Logging setup
 logging.getLogger().setLevel(logging.INFO)
@@ -20,11 +21,11 @@ def home():
 def run_flask():
     app.run(host='0.0.0.0', port=8000)
 
-class Private_Bots(Client):
+class MN_Bot(Client):  # Changed class name to MN_Bot
 
     def __init__(self):
         super().__init__(
-            "Forward-Tag-Remover",
+            "MN-Bot",
             API.ID,
             API.HASH,
             bot_token=BOT.TOKEN,
@@ -61,14 +62,15 @@ class Private_Bots(Client):
         while True:
             try:
                 torrents = crawl_yts()
-                new_torrents = [t for t in torrents if t not in self.last_posted_links]
+                new_torrents = [t for t in torrents if t["link"] not in self.last_posted_links]
                 
                 if new_torrents:
                     for torrent in new_torrents:
-                        await self.send_message(self.channel_id, torrent)
-                    self.last_posted_links.update(new_torrents)
+                        message = f"{torrent['link']}\n\n🎬 {torrent['title']}\n📦 {torrent['size']}\n\n#yts powered by @MNBOTS"
+                        await self.send_message(self.channel_id, message)
+                        self.last_posted_links.add(torrent["link"])
 
-                logging.info("✅ Auto-posted new YTS torrents")
+                    logging.info("✅ Auto-posted new YTS torrents")
             except Exception as e:
                 logging.error(f"⚠️ Error in auto_post_yts: {e}")
 
@@ -81,11 +83,25 @@ def crawl_yts():
 
     torrents = []
     for entry in feed.entries:
-        download_link = entry.enclosures[0]["href"]  # Direct download link
-        torrents.append(f" {download_link}")
+        title = entry.title  # Movie title
+        size = parse_size_yts(entry.description)  # Extract size
+        link = entry.enclosures[0]["href"]  # Torrent link
 
-    return torrents[:5]  # Limit to the latest 5 torrents
+        if size:
+            torrents.append({
+                "title": title,
+                "size": size,
+                "link": link
+            })
+
+    return torrents[:15]  # Limit to the latest 15 torrents
+
+# Extract size from description (YTS format: "<b>Size:</b> 1.2 GB")
+def parse_size_yts(description):
+    match = re.search(r"<b>Size:</b>\s*([\d.]+\s*[GMK]B)", description)
+    return match.group(1) if match else "Unknown"
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
-    Private_Bots().run()
+    MN_Bot().run()  # Updated to use MN_Bot
+
